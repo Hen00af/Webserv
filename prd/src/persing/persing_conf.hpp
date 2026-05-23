@@ -1,7 +1,6 @@
 #ifndef PersingConf_HPP
 # define PersingConf_HPP
 
-#include "../server/server.hpp"
 # include <iostream>
 # include <fstream>
 # include <vector>

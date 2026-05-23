@@ -32,26 +32,11 @@ class Server {
 public:
     Server();
     ~Server();
-    // サーバーの初期化（socket, bind, listenまで行う）
-    void    initServer(int port);
-    // Getter（後のselect/poll/kqueueで使用）
-    int     getListenFd() const;
     void    boot_server(Conf &conf);
     void    build_connection(const std::vector<ServerConfig> &servers);
 
-    //　クライアントごとに送受信のバッファを持つように実装
-    struct ClientState {
-        std::string read_buffer;
-        std::string write_buffer;
-    };
-
 private:
-    int                 _listen_fd;    // ソケットディスクリプタ
-    struct sockaddr_in  _addr;      // サーバーのアドレス情報
-    int                 _port;         // ポート番号
-    int                 _server_fd;    // サーバのfd
-    int                 _client_fd;    // クライアントのfd
-
+    std::vector<int> _server_fds;
 };
 
 #endif

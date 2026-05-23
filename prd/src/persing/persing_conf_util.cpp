@@ -1,4 +1,4 @@
-#include "conf.hpp"
+#include "persing_conf.hpp"
 
 std::vector<std::string> Conf::split_words(std::string line) {
     std::vector<std::string> tokens;

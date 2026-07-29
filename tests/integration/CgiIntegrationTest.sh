@@ -1,6 +1,9 @@
 #!/bin/sh
 
 set -eu
+if [ -n "${CI:-}" ]; then
+    set -x
+fi
 
 ./webserv config/default.conf >/tmp/webserv-cgi-integration.log 2>&1 &
 server_pid=$!

@@ -158,7 +158,9 @@ bool CgiHandler::start(const Request &request, const RouteResult &route,
         close(inputPipe[1]);
         close(outputPipe[0]);
         close(outputPipe[1]);
-        const long descriptorLimit = sysconf(_SC_OPEN_MAX);
+        long descriptorLimit = sysconf(_SC_OPEN_MAX);
+        if (descriptorLimit < 0 || descriptorLimit > 4096)
+            descriptorLimit = 4096;
         for (int fd = 3; fd < descriptorLimit; ++fd)
             close(fd);
         setResourceLimit(RLIMIT_CPU,

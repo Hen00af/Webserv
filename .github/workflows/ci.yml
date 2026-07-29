@@ -1,0 +1,51 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y php-cgi
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Unit and component tests
+        run: make test
+
+      - name: HTTP and CGI integration tests
+        run: make integration-test
+
+      - name: Stress tests
+        run: make stress-test
+
+      - name: Docker build
+        run: docker compose build
+
+  sanitizer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with AddressSanitizer and UBSan
+        run: |
+          make re CXXFLAGS="-Wall -Wextra -Werror -std=c++98 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer"
+
+      - name: Run unit and component tests
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: |
+          make test CXXFLAGS="-Wall -Wextra -Werror -std=c++98 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer"

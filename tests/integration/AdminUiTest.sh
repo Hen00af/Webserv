@@ -37,6 +37,7 @@ grep -q 'const MAX_REQUESTS = 100' /tmp/webserv-admin-js
 grep -q 'const MAX_CONCURRENCY = 8' /tmp/webserv-admin-js
 grep -q 'SAFE_TARGETS' /tmp/webserv-admin-js
 grep -q 'LOCAL_HOSTS' /tmp/webserv-admin-js
+grep -q 'exportCsv' /tmp/webserv-admin-js
 
 test "$(curl -sS -o /tmp/webserv-admin-post -w '%{http_code}' \
     -X POST -d '' http://127.0.0.1:8080/admin/)" = "405"

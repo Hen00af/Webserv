@@ -10,8 +10,14 @@ Response Dispatcher::dispatch(const Request &request, const ServerConfig &config
     if (route.status == ROUTE_METHOD_NOT_ALLOWED) {
         Response response = ResponseFactory::error(405, config);
         std::string allow;
-        for (size_t i = 0; i < route.methods->size(); ++i)
+        bool hasGet = false;
+        for (size_t i = 0; i < route.methods->size(); ++i) {
             allow += (i ? ", " : "") + (*route.methods)[i];
+            if ((*route.methods)[i] == "GET")
+                hasGet = true;
+        }
+        if (hasGet)
+            allow += ", HEAD";
         response.headers["Allow"] = allow;
         return response;
     }

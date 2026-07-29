@@ -34,6 +34,7 @@
     errors: document.querySelector("#errorMetric"),
     rows: document.querySelector("#sampleRows"),
     clearButton: document.querySelector("#clearButton"),
+    exportButton: document.querySelector("#exportButton"),
     probeButton: document.querySelector("#probeButton"),
     serverLamp: document.querySelector("#serverLamp"),
     serverStatus: document.querySelector("#serverStatus"),
@@ -152,6 +153,7 @@
 
   function renderRows() {
     elements.rows.replaceChildren();
+    elements.exportButton.disabled = samples.length === 0;
     if (!samples.length) {
       const row = document.createElement("tr");
       row.className = "empty-row";
@@ -170,6 +172,29 @@
       `;
       elements.rows.append(row);
     });
+  }
+
+  function exportCsv() {
+    if (!samples.length) return;
+    const rows = [
+      ["id", "status", "ok", "aborted", "latency_ms", "target"],
+      ...samples.map((sample) => [
+        sample.id,
+        sample.status,
+        sample.ok,
+        sample.aborted,
+        sample.latency.toFixed(2),
+        sample.target
+      ])
+    ];
+    const csv = rows
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = `webserv-load-${new Date().toISOString().replaceAll(":", "-")}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   async function executeRequest(target, run, id) {
@@ -301,6 +326,7 @@
     renderRail([]);
     renderMetrics([], 0);
   });
+  elements.exportButton.addEventListener("click", exportCsv);
 
   updateRangeOutputs();
   configureSafety();

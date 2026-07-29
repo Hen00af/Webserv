@@ -1,0 +1,46 @@
+services:
+  webserv:
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    read_only: true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: "1.0"
+    ulimits:
+      nofile:
+        soft: 2048
+        hard: 2048
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    volumes:
+      - uploads:/app/www/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  caddy:
+    image: caddy:2.11.4
+    depends_on:
+      webserv:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      WEBSERV_DOMAIN: "${WEBSERV_DOMAIN:-localhost}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  uploads:
+  caddy_data:
+  caddy_config:

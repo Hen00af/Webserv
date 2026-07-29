@@ -9,9 +9,8 @@ loop for non-blocking socket I/O and supports multiple listening ports, static
 files, directory indexes, uploads, redirects, custom error pages, and the GET,
 POST, and DELETE methods.
 
-The repository root is the canonical, deployable implementation. Historical
-experiments remain under `prd/`, `lab/`, and `sample/` and are excluded from the
-container image.
+The repository root contains only the canonical, deployable implementation,
+its tests, and supporting documentation.
 
 The main directories are:
 
@@ -38,11 +37,11 @@ curl http://localhost:8080/health/
 
 Open `http://localhost:8080/admin/` for the Webserv Control Plane. It provides
 endpoint probes and a browser-based load profile with live success,
-throughput, median, and P95 latency readouts. Load generation is restricted to
-fixed same-origin endpoints, capped at 100 requests and concurrency 8, and
-disabled unless the page is opened on `localhost`, `127.0.0.1`, or `::1`.
-This is a local development instrument, not an authenticated production admin
-panel.
+throughput, median, and P95 latency readouts, plus CSV result export. Load
+generation is restricted to fixed same-origin endpoints, capped at 100
+requests and concurrency 8, and disabled unless the page is opened on
+`localhost`, `127.0.0.1`, or `::1`. This is a local development instrument,
+not an authenticated production admin panel.
 
 Run the unit and component tests:
 
@@ -56,9 +55,11 @@ The test suite covers configuration parsing, HTTP parsing and serialization,
 longest-prefix routing, method and redirect decisions, static files, directory
 listings, custom error pages, uploads, and deletion. Handler tests create
 isolated fixtures under `/tmp` and do not modify `www/`.
-The integration tests exercise CGI GET/POST, verify that a static request is
-still served while another CGI process is sleeping, and check that the Control
-Plane assets and method restrictions are served correctly.
+The integration tests exercise HEAD, keep-alive pipelining, chunked request
+framing, CGI GET/POST, concurrent static responses during a sleeping CGI
+process, and Control Plane assets and method restrictions. See
+[`docs/http-compliance.md`](docs/http-compliance.md) for the supported protocol
+surface.
 
 Run on Linux with Docker:
 
@@ -182,6 +183,16 @@ mounts persistent storage for uploads. Configure the platform health check as
 variable, render a matching config before startup or map that platform port to
 container port 8080. Place TLS termination and public HTTPS in front of Webserv
 using the platform load balancer or a reverse proxy.
+
+For a self-hosted HTTPS deployment, use the included Caddy profile:
+
+```sh
+WEBSERV_DOMAIN=webserv.example.com \
+  docker compose -f compose.production.yaml up --build -d
+```
+
+See [`docs/deployment-security.md`](docs/deployment-security.md) for DNS,
+firewall, TLS, and Control Plane exposure notes.
 
 ## Resources
 

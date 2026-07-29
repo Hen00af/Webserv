@@ -165,7 +165,7 @@ bool CgiHandler::start(const Request &request, const RouteResult &route,
             close(fd);
         setResourceLimit(RLIMIT_CPU,
                          static_cast<rlim_t>(route.location->cgiTimeout + 1));
-        setResourceLimit(RLIMIT_AS, static_cast<rlim_t>(256) * 1024 * 1024);
+        setResourceLimit(RLIMIT_AS, static_cast<rlim_t>(1024) * 1024 * 1024);
         setResourceLimit(RLIMIT_FSIZE, static_cast<rlim_t>(17) * 1024 * 1024);
         if (chdir(directory.c_str()) != 0)
             _exit(126);

@@ -9,9 +9,8 @@ loop for non-blocking socket I/O and supports multiple listening ports, static
 files, directory indexes, uploads, redirects, custom error pages, and the GET,
 POST, and DELETE methods.
 
-The repository root is the canonical, deployable implementation. Historical
-experiments remain under `prd/`, `lab/`, and `sample/` and are excluded from the
-container image.
+The repository root contains only the canonical, deployable implementation,
+its tests, and supporting documentation.
 
 The main directories are:
 

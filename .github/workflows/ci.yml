@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install runtime dependencies
         run: sudo apt-get update && sudo apt-get install -y php-cgi
@@ -22,7 +22,12 @@ jobs:
         run: make test
 
       - name: HTTP and CGI integration tests
-        run: make integration-test
+        run: |
+          make integration-test || {
+            cat /tmp/webserv-cgi-integration.log 2>/dev/null || true
+            cat /tmp/webserv-admin-ui.log 2>/dev/null || true
+            exit 1
+          }
 
       - name: Stress tests
         run: make stress-test
@@ -35,7 +40,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build with AddressSanitizer and UBSan
         run: |

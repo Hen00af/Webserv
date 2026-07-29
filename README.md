@@ -51,6 +51,16 @@ make integration-test
 make stress-test
 ```
 
+Run a capped HTTP/1.1 load profile against the local server:
+
+```sh
+python3 tools/load_test.py health -n 100 -c 8
+python3 tools/load_test.py python-cgi -n 100 -c 8
+```
+
+The command accepts only bundled targets and caps execution at 1,000 requests
+and concurrency 32.
+
 The test suite covers configuration parsing, HTTP parsing and serialization,
 longest-prefix routing, method and redirect decisions, static files, directory
 listings, custom error pages, uploads, and deletion. Handler tests create

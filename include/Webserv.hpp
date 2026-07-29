@@ -71,8 +71,9 @@ struct Request {
     std::string body;
     std::string remoteAddress;
     unsigned short remotePort;
+    size_t consumed;
 
-    Request() : remotePort(0) {}
+    Request() : remotePort(0), consumed(0) {}
 };
 
 struct Response {
@@ -80,7 +81,7 @@ struct Response {
     std::map<std::string, std::string> headers;
     std::string body;
     Response(int code);
-    std::string serialize() const;
+    std::string serialize(bool omitBody = false, bool keepAlive = false) const;
 };
 
 enum ParseResult {
@@ -121,6 +122,8 @@ class Server {
         std::string remoteAddress;
         unsigned short remotePort;
         size_t timeoutSeconds;
+        bool keepAlive;
+        bool omitBody;
         ClientPhase phase;
         Client();
     };
@@ -134,6 +137,7 @@ class Server {
     void openListeners();
     void acceptClient(size_t index);
     void readClient(size_t index);
+    void processClientInput(size_t index);
     void writeClient(size_t index);
     void writeCgi(size_t index);
     void readCgi(size_t index);

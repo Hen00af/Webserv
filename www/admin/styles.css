@@ -406,6 +406,12 @@ button:disabled { cursor: not-allowed; opacity: 0.42; }
   text-transform: uppercase;
 }
 
+.trace-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
 .table-wrap { overflow-x: auto; }
 
 table {

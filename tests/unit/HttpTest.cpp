@@ -22,6 +22,9 @@ int main() {
     expect(request.method == "GET", "method should be parsed");
     expect(request.path == "/hello", "path should exclude query");
     expect(request.query == "q=42", "query should be parsed");
+    expect(request.consumed ==
+               std::string("GET /hello?q=42 HTTP/1.1\r\nHost: test\r\n\r\n").size(),
+           "parser should report consumed request bytes");
 
     request = Request();
     result = parseRequest("GET / HTTP/1.1\r\n\r\n", 1024, request);
@@ -50,6 +53,12 @@ int main() {
         1024, request);
     expect(result == REQUEST_OK, "complete chunked body should parse");
     expect(request.body == "hello", "chunked body should be decoded");
+    expect(request.consumed ==
+               std::string(
+                   "POST /upload HTTP/1.1\r\nHost: test\r\n"
+                   "Transfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+                   .size(),
+           "chunked parser should report consumed request bytes");
 
     request = Request();
     result = parseRequest(
@@ -124,6 +133,14 @@ int main() {
            "response should include Content-Length");
     expect(serialized.find("\r\n\r\nhello") != std::string::npos,
            "response should separate headers and body");
+
+    const std::string head = response.serialize(true, true);
+    expect(head.find("Content-Length: 5\r\n") != std::string::npos,
+           "HEAD response should preserve GET Content-Length");
+    expect(head.find("Connection: keep-alive\r\n") != std::string::npos,
+           "persistent response should advertise keep-alive");
+    expect(head.find("\r\n\r\nhello") == std::string::npos,
+           "HEAD response should omit the response body");
 
     if (g_failures != 0)
         return 1;

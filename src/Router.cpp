@@ -6,7 +6,7 @@ RouteResult::RouteResult()
 static bool methodAllowed(const std::vector<std::string> &methods,
                           const std::string &method) {
     for (size_t i = 0; i < methods.size(); ++i)
-        if (methods[i] == method)
+        if (methods[i] == method || (method == "HEAD" && methods[i] == "GET"))
             return true;
     return false;
 }

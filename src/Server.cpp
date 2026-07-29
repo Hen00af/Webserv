@@ -14,7 +14,8 @@ static const size_t MAX_HEADER_OVERHEAD = 65536;
 Server::Client::Client()
     : fd(-1), config(NULL), sent(0), touched(0), cgiPid(-1),
       cgiInputFd(-1), cgiOutputFd(-1), cgiWritten(0), remotePort(0),
-      timeoutSeconds(30), phase(CLIENT_READING) {}
+      timeoutSeconds(30), keepAlive(false), omitBody(false),
+      phase(CLIENT_READING) {}
 
 static void nonBlocking(int fd) {
     const int flags = fcntl(fd, F_GETFL, 0);
@@ -148,7 +149,8 @@ bool Server::startCgi(size_t index, const Request &request) {
             ++runningCgi;
     if (runningCgi >= MAX_CGI_PROCESSES) {
         client.output =
-            ResponseFactory::error(503, *client.config).serialize();
+            ResponseFactory::error(503, *client.config)
+                .serialize(client.omitBody, client.keepAlive);
         client.phase = CLIENT_WRITING;
         _pollfds[index].events = POLLOUT;
         return true;
@@ -160,14 +162,16 @@ bool Server::startCgi(size_t index, const Request &request) {
     if (scriptResult != FILE_OK) {
         const int status = scriptResult == FILE_NOT_FOUND ? 404 : 403;
         client.output =
-            ResponseFactory::error(status, *client.config).serialize();
+            ResponseFactory::error(status, *client.config)
+                .serialize(client.omitBody, client.keepAlive);
         client.phase = CLIENT_WRITING;
         _pollfds[index].events = POLLOUT;
         return true;
     }
     CgiProcess process;
     if (!CgiHandler::start(request, securedRoute, *client.config, process)) {
-        client.output = ResponseFactory::error(500, *client.config).serialize();
+        client.output = ResponseFactory::error(500, *client.config)
+                            .serialize(client.omitBody, client.keepAlive);
         _pollfds[index].events = POLLOUT;
         return true;
     }
@@ -221,7 +225,8 @@ void Server::readClient(size_t index) {
                                      MAX_HEADER_OVERHEAD
             ? std::numeric_limits<size_t>::max()
             : client.config->maxBody + MAX_HEADER_OVERHEAD;
-    if (client.input.size() > requestLimit - incoming) {
+    if (incoming > requestLimit ||
+        client.input.size() > requestLimit - incoming) {
         client.output =
             ResponseFactory::error(413, *client.config).serialize();
         client.phase = CLIENT_WRITING;
@@ -230,6 +235,19 @@ void Server::readClient(size_t index) {
     }
     client.input.append(buffer, incoming);
     client.touched = std::time(NULL);
+    processClientInput(index);
+}
+
+static bool requestKeepAlive(const Request &request) {
+    std::map<std::string, std::string>::const_iterator connection =
+        request.headers.find("connection");
+    return connection == request.headers.end() ||
+           lower(trim(connection->second)) != "close";
+}
+
+void Server::processClientInput(size_t index) {
+    const int fd = _pollfds[index].fd;
+    Client &client = _clients[fd];
     Request request;
     const ParseResult result =
         parseRequest(client.input, client.config->maxBody, request);
@@ -237,8 +255,16 @@ void Server::readClient(size_t index) {
         return;
     request.remoteAddress = client.remoteAddress;
     request.remotePort = client.remotePort;
-    if (result == REQUEST_OK && startCgi(index, request))
-        return;
+    if (result == REQUEST_OK) {
+        client.keepAlive = requestKeepAlive(request);
+        client.omitBody = request.method == "HEAD";
+        client.input.erase(0, request.consumed);
+        if (startCgi(index, request))
+            return;
+    } else {
+        client.keepAlive = false;
+        client.omitBody = false;
+    }
 
     Response response =
         result == REQUEST_TOO_LARGE
@@ -248,7 +274,7 @@ void Server::readClient(size_t index) {
             : (result == REQUEST_BAD
                    ? ResponseFactory::error(400, *client.config)
                    : Dispatcher::dispatch(request, *client.config)));
-    client.output = response.serialize();
+    client.output = response.serialize(client.omitBody, client.keepAlive);
     client.phase = CLIENT_WRITING;
     _pollfds[index].events = POLLOUT;
 }
@@ -267,8 +293,21 @@ void Server::writeClient(size_t index) {
     }
     client.sent += static_cast<size_t>(count);
     client.touched = std::time(NULL);
-    if (client.sent == client.output.size())
-        closeClient(fd);
+    if (client.sent == client.output.size()) {
+        if (!client.keepAlive) {
+            closeClient(fd);
+            return;
+        }
+        client.output.clear();
+        client.sent = 0;
+        client.keepAlive = false;
+        client.omitBody = false;
+        client.phase = CLIENT_READING;
+        client.timeoutSeconds = 30;
+        _pollfds[index].events = POLLIN;
+        if (!client.input.empty())
+            processClientInput(index);
+    }
 }
 
 void Server::writeCgi(size_t index) {
@@ -345,7 +384,7 @@ void Server::finishCgi(int clientFd, int waitStatus) {
         success ? CgiHandler::makeResponse(client.cgiOutput, *client.config)
                 : ResponseFactory::error(500, *client.config);
     client.cgiPid = -1;
-    client.output = response.serialize();
+    client.output = response.serialize(client.omitBody, client.keepAlive);
     client.sent = 0;
     client.touched = std::time(NULL);
     client.phase = CLIENT_WRITING;
@@ -436,6 +475,8 @@ void Server::expireClients() {
                 client.cgiOutputFd = -1;
             }
             client.cgiPid = -1;
+            client.keepAlive = false;
+            client.omitBody = false;
             client.output =
                 ResponseFactory::error(504, *client.config).serialize();
             client.sent = 0;
@@ -445,6 +486,8 @@ void Server::expireClients() {
                 if (_pollfds[j].fd == client.fd)
                     _pollfds[j].events = POLLOUT;
         } else if (client.output.empty()) {
+            client.keepAlive = false;
+            client.omitBody = false;
             client.output =
                 ResponseFactory::error(408, *client.config).serialize();
             client.sent = 0;

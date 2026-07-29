@@ -25,15 +25,16 @@ std::string reasonPhrase(int status) {
     }
 }
 
-std::string Response::serialize() const {
+std::string Response::serialize(bool omitBody, bool keepAlive) const {
     std::ostringstream out;
     out << "HTTP/1.1 " << status << " " << reasonPhrase(status) << "\r\n";
     for (std::map<std::string, std::string>::const_iterator it = headers.begin();
          it != headers.end(); ++it)
         out << it->first << ": " << it->second << "\r\n";
     out << "Content-Length: " << body.size() << "\r\n";
-    out << "Connection: close\r\n\r\n";
-    out << body;
+    out << "Connection: " << (keepAlive ? "keep-alive" : "close") << "\r\n\r\n";
+    if (!omitBody)
+        out << body;
     return out.str();
 }
 
@@ -82,10 +83,12 @@ static bool decodePath(const std::string &input, std::string &output) {
     return true;
 }
 
-static bool parseChunked(const std::string &input, std::string &body, bool &complete) {
+static bool parseChunked(const std::string &input, std::string &body,
+                         bool &complete, size_t &consumed) {
     size_t pos = 0;
     body.clear();
     complete = false;
+    consumed = 0;
     while (true) {
         size_t end = input.find("\r\n", pos);
         if (end == std::string::npos)
@@ -107,6 +110,7 @@ static bool parseChunked(const std::string &input, std::string &body, bool &comp
         if (chunkSize == 0) {
             if (input.compare(pos, 2, "\r\n") == 0) {
                 complete = true;
+                consumed = pos + 2;
                 return true;
             }
             const size_t trailersEnd = input.find("\r\n\r\n", pos);
@@ -121,6 +125,7 @@ static bool parseChunked(const std::string &input, std::string &body, bool &comp
                 trailer = trailerEnd + 2;
             }
             complete = true;
+            consumed = trailersEnd + 4;
             return true;
         }
         if (input.size() < pos + chunkSize + 2)
@@ -199,10 +204,13 @@ ParseResult parseRequest(const std::string &raw, size_t maxBody, Request &reques
         return REQUEST_BAD;
     if (hasTransferEncoding) {
         bool complete = false;
-        if (!parseChunked(payload, request.body, complete))
+        size_t payloadConsumed = 0;
+        if (!parseChunked(payload, request.body, complete, payloadConsumed))
             return REQUEST_BAD;
         if (request.body.size() > maxBody)
             return REQUEST_TOO_LARGE;
+        if (complete)
+            request.consumed = headerEnd + 4 + payloadConsumed;
         return complete ? REQUEST_OK : REQUEST_INCOMPLETE;
     }
     size_t length = 0;
@@ -225,5 +233,6 @@ ParseResult parseRequest(const std::string &raw, size_t maxBody, Request &reques
     if (payload.size() < length)
         return REQUEST_INCOMPLETE;
     request.body = payload.substr(0, length);
+    request.consumed = headerEnd + 4 + length;
     return REQUEST_OK;
 }

@@ -36,6 +36,7 @@ test: $(TEST_BINS)
 	./.obj/cgi_handler_test
 
 integration-test: all
+	python3 tests/integration/HttpProtocolTest.py
 	sh tests/integration/CgiIntegrationTest.sh
 	sh tests/integration/AdminUiTest.sh
 

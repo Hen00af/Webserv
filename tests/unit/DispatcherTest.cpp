@@ -74,6 +74,11 @@ int main() {
     expect(response.headers["Content-Type"] == "text/plain; charset=utf-8",
            "GET should determine MIME type");
 
+    response = Dispatcher::dispatch(makeRequest("HEAD", "/hello.txt"), config);
+    expect(response.status == 200, "HEAD should use GET routing");
+    expect(response.body == "hello dispatcher\n",
+           "HEAD should calculate the same representation metadata as GET");
+
     response = Dispatcher::dispatch(makeRequest("GET", "/missing"), config);
     expect(response.status == 404, "missing file should return 404");
     expect(response.body == "custom not found\n", "404 should use configured error page");
@@ -125,7 +130,8 @@ int main() {
 
     response = Dispatcher::dispatch(makeRequest("PUT", "/hello.txt"), config);
     expect(response.status == 405, "disallowed method should return 405");
-    expect(response.headers["Allow"] == "GET", "405 should include Allow header");
+    expect(response.headers["Allow"] == "GET, HEAD",
+           "405 should include implicit HEAD support");
 
     response = Dispatcher::dispatch(makeRequest("GET", "/old"), config);
     expect(response.status == 301, "configured redirect should return 301");
